@@ -5,7 +5,10 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from openpyxl import Workbook, load_workbook
+import inflect  # 新增：用于处理单复数
 
+# 初始化复数转换器
+p = inflect.engine()
 
 DEFAULT_INPUT = Path(
     r"C:\Users\megamind\Desktop\proquest全文清洗2025.12.16 的定稿(2).xlsm"
@@ -65,6 +68,23 @@ TERMS = [
 
 TOKEN_RE = re.compile(r"[a-z]+(?:'[a-z]+)?")
 
+# 新增函数：获取词的所有形式（单数、复数）
+def get_all_forms(term: str) -> list[str]:
+    """获取一个词的所有形式（单数、复数、小写）"""
+    term_lower = term.lower()
+    forms = {term_lower}
+    
+    # 添加复数形式
+    plural = p.plural(term_lower)
+    if plural != term_lower:
+        forms.add(plural)
+    
+    # 添加单数形式（如果原词是复数）
+    singular = p.singular_noun(term_lower)
+    if singular:
+        forms.add(singular)
+    
+    return list(forms)
 
 @dataclass
 class TermStats:
@@ -75,11 +95,21 @@ class TermStats:
 
 
 def normalize_text(value) -> str:
-    return str(value or "").strip().lower()
+    """归一化文本：转小写，去除所有格's"""
+    text = str(value or "").strip().lower()
+    # 去除所有格 's 和 s'（如 "country's" -> "country"）
+    text = re.sub(r"'s\b", "", text)
+    text = re.sub(r"s'\b", "s", text)
+    return text
 
 
 def build_pattern(term: str) -> re.Pattern[str]:
-    return re.compile(rf"(?<![a-z]){re.escape(term.lower())}(?![a-z])")
+    """构建匹配模式，匹配单数和复数形式，忽略大小写"""
+    forms = get_all_forms(term)
+    # 按长度降序排序，避免部分匹配
+    forms.sort(key=len, reverse=True)
+    pattern = "|".join(rf"\b{re.escape(form)}\b" for form in forms)
+    return re.compile(pattern, re.IGNORECASE)
 
 
 def read_documents(file_path: Path, sheet_name: str, column_index: int) -> list[str]:

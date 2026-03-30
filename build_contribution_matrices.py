@@ -4,7 +4,9 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from openpyxl import Workbook, load_workbook
+import inflect  # 新增
 
+p = inflect.engine()  # 初始化
 
 DEFAULT_INPUT = Path(
     r"C:\Users\megamind\Desktop\proquest全文清洗2025.12.16 的定稿(2).xlsm"
@@ -18,9 +20,25 @@ DEFAULT_OUTPUT = Path(
 DEFAULT_SHEET = "Sheet1"
 DEFAULT_COLUMN = 3
 
+
 TOKEN_RE = re.compile(r"[a-z]+(?:'[a-z]+)?")
 PARAGRAPH_SPLIT_RE = re.compile(r"\n\s*\n+")
 
+# 新增函数
+def get_all_forms(term: str) -> list[str]:
+    """获取一个词的所有形式（单数、复数）"""
+    term_lower = term.lower()
+    forms = {term_lower}
+    
+    plural = p.plural(term_lower)
+    if plural != term_lower:
+        forms.add(plural)
+    
+    singular = p.singular_noun(term_lower)
+    if singular:
+        forms.add(singular)
+    
+    return list(forms)
 
 @dataclass
 class TermInfo:
@@ -30,11 +48,22 @@ class TermInfo:
 
 
 def normalize_text(value) -> str:
+    """归一化文本：转小写，去除所有格"""
+    text = str(value or "").strip().lower()
+    # 去除所有格 's 和 s'
+    text = re.sub(r"'s\b", "", text)
+    text = re.sub(r"s'\b", "s", text)
+    return text
     return str(value or "").strip().lower()
 
 
+
 def build_pattern(term: str) -> re.Pattern[str]:
-    return re.compile(rf"(?<![a-z]){re.escape(term.lower())}(?![a-z])")
+    """构建匹配模式，匹配单数和复数形式，忽略大小写"""
+    forms = get_all_forms(term)
+    forms.sort(key=len, reverse=True)
+    pattern = "|".join(rf"\b{re.escape(form)}\b" for form in forms)
+    return re.compile(pattern, re.IGNORECASE)
 
 
 def load_terms(file_path: Path) -> list[TermInfo]:
