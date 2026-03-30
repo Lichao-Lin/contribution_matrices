@@ -48,12 +48,9 @@ class TermInfo:
 
 
 def normalize_text(value) -> str:
-    """归一化文本：转小写，去除所有格"""
-    text = str(value or "").strip().lower()
-    # 去除所有格 's 和 s'
-    text = re.sub(r"'s\b", "", text)
-    text = re.sub(r"s'\b", "s", text)
-    return text
+    """
+    只做基本清洗，不去除 's
+    """
     return str(value or "").strip().lower()
 
 
@@ -62,7 +59,7 @@ def build_pattern(term: str) -> re.Pattern[str]:
     """构建匹配模式，匹配单数和复数形式，忽略大小写"""
     forms = get_all_forms(term)
     forms.sort(key=len, reverse=True)
-    pattern = "|".join(rf"\b{re.escape(form)}\b" for form in forms)
+    pattern = "|".join(rf"(?<![a-z]){re.escape(form)}(?![a-z])" for form in forms)
     return re.compile(pattern, re.IGNORECASE)
 
 

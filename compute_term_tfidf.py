@@ -108,7 +108,7 @@ def build_pattern(term: str) -> re.Pattern[str]:
     forms = get_all_forms(term)
     # 按长度降序排序，避免部分匹配
     forms.sort(key=len, reverse=True)
-    pattern = "|".join(rf"\b{re.escape(form)}\b" for form in forms)
+    pattern = "|".join(rf"(?<![a-z]){re.escape(form)}(?![a-z])" for form in forms)
     return re.compile(pattern, re.IGNORECASE)
 
 
